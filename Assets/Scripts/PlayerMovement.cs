@@ -8,6 +8,13 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(Rigidbody2D))]
 public class PlayerMovement : MonoBehaviour
 {
+    public enum ControlScheme { Keyboard, MouseOnly }
+
+    [Header("Input")]
+    [SerializeField] private ControlScheme controlScheme = ControlScheme.Keyboard;
+    [SerializeField] private Camera mainCamera;
+    [SerializeField] private float mouseDeadzone = 0.3f;
+
     [Header("References")]
     [SerializeField] private Rigidbody2D rb;
 
@@ -58,8 +65,12 @@ public class PlayerMovement : MonoBehaviour
     public bool dash;
     public bool isPushingWall;
     public bool isSliding;
+    public bool IsJumpHeld { get; private set; }
 
     public float speed;
+
+    private InputSystem_Actions controls;
+    public InputSystem_Actions Controls => controls;
 
     // --- EVENTS ---
     public event Action<int> OnMoving;
@@ -72,6 +83,18 @@ public class PlayerMovement : MonoBehaviour
     void Awake()
     {
         if (!rb) rb = GetComponent<Rigidbody2D>();
+        if (!mainCamera) mainCamera = Camera.main;
+        controls = new InputSystem_Actions();
+    }
+
+    void OnEnable()
+    {
+        controls.Player.Enable();
+    }
+
+    void OnDisable()
+    {
+        controls.Player.Disable();
     }
 
     void Update()
@@ -79,16 +102,43 @@ public class PlayerMovement : MonoBehaviour
         ColisionChecker();
         OnGround?.Invoke(isGrounded);
 
-        float move = 0f;
-        if (Keyboard.current.aKey.isPressed || Keyboard.current.leftArrowKey.isPressed) move = -1f;
-        if (Keyboard.current.dKey.isPressed || Keyboard.current.rightArrowKey.isPressed) move = 1f;
-        direction = Mathf.RoundToInt(move);
+        direction = GetMoveDirection();
+        IsJumpHeld = controls.Player.Jump.IsPressed();
 
         ApplyLayer(layerChanger.layerIndex);
 
         OnWall();
         Move();
         Jump();
+
+        if (Keyboard.current.tabKey.wasPressedThisFrame)
+            SetControlScheme(controlScheme == ControlScheme.Keyboard ? ControlScheme.MouseOnly : ControlScheme.Keyboard);
+    }
+
+    private int GetMoveDirection()
+    {
+        if (controlScheme == ControlScheme.Keyboard)
+        {
+            Vector2 moveInput = controls.Player.Move.ReadValue<Vector2>();
+            return Mathf.RoundToInt(moveInput.x);
+        }
+
+        if (!Mouse.current.leftButton.isPressed) return 0;
+
+        Vector2 mouseScreenPos = controls.Player.MousePosition.ReadValue<Vector2>();
+        Vector3 screenPoint = mainCamera.WorldToScreenPoint(transform.position);
+        screenPoint.x = mouseScreenPos.x;
+        screenPoint.y = mouseScreenPos.y;
+        Vector3 mouseWorldPos = mainCamera.ScreenToWorldPoint(screenPoint);
+
+        float dx = mouseWorldPos.x - transform.position.x;
+        if (Mathf.Abs(dx) < mouseDeadzone) return 0;
+        return dx > 0f ? 1 : -1;
+    }
+
+    public void SetControlScheme(ControlScheme scheme)
+    {
+        controlScheme = scheme;
     }
 
     private void ApplyLayer(int layer)
@@ -101,8 +151,10 @@ public class PlayerMovement : MonoBehaviour
 
     private void Jump()
     {
-        bool canWallJumpLeft = !isGrounded && isSliding && wallLeft && lastWallJumpSide != -1;
-        bool canWallJumpRight = !isGrounded && isSliding && wallRight && lastWallJumpSide != 1;
+        bool touchingWallLeft = !isGrounded && direction < 0 && wallLeft && lastWallJumpSide != -1;
+        bool touchingWallRight = !isGrounded && direction > 0 && wallRight && lastWallJumpSide != 1;
+        bool canWallJumpLeft = touchingWallLeft;
+        bool canWallJumpRight = touchingWallRight;
 
         if (isGrounded)
         {
@@ -125,7 +177,7 @@ public class PlayerMovement : MonoBehaviour
             coyoteTimeCounter -= Time.deltaTime;
         }
 
-        if (Keyboard.current.spaceKey.wasPressedThisFrame)
+        if (controls.Player.Jump.WasPressedThisFrame())
             jumpBufferCounter = jumpBufferTime;
         else
             jumpBufferCounter -= Time.deltaTime;
@@ -139,11 +191,11 @@ public class PlayerMovement : MonoBehaviour
             if (coyoteSourceSide != 0)
             {
                 lastWallJumpSide = coyoteSourceSide;
-                OnWallJump?.Invoke(coyoteSourceSide); 
+                OnWallJump?.Invoke(coyoteSourceSide);
             }
 
             OnJump?.Invoke();
-            coyoteSourceSide = 0; 
+            coyoteSourceSide = 0;
         }
     }
 

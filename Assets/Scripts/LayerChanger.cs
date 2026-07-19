@@ -9,7 +9,14 @@ using System.Collections.Generic;
 public class LayerChanger : MonoBehaviour
 {
     public static LayerChanger Instance { get; private set; }
- 
+
+    [Header("Player Reference")]
+    [SerializeField] private PlayerMovement playerMovement;
+    [SerializeField] private Transform player;
+    [SerializeField] private SpriteRenderer playerRenderer;
+    [SerializeField] private CapsuleCollider2D playerCollider;
+    [SerializeField] private float[] playerScales = { 0.5f, 1f, 2f };
+
     [Header("Cam Reference")]
     [SerializeField] private CinemachineCamera vCam;
     [SerializeField] private float[] zoomSizes = { 5f, 8f, 10f };
@@ -22,12 +29,6 @@ public class LayerChanger : MonoBehaviour
     [SerializeField] private string[] dimensionLayerNames;
     [SerializeField] private string[] pushableLayerNames;
     [SerializeField] private string playerLayerName = "Player";
-
-    [Header("Player Reference")]
-    [SerializeField] private Transform player;
-    [SerializeField] private SpriteRenderer playerRenderer;
-    [SerializeField] private CapsuleCollider2D playerCollider;
-    [SerializeField] private float[] playerScales = { 0.5f, 1f, 2f };
 
     [Header("Fit Check")]
     [SerializeField] private LayerMask floorMask;
@@ -65,6 +66,9 @@ public class LayerChanger : MonoBehaviour
     private int[] pushableLayerIds;
     private int playerLayerId;
 
+    private InputSystem_Actions controls;
+    private float lastScrollValue = 0f;
+
     // --- EVENTS ---
     public event Action<int> OnLayerChanged;
     public event Action OnLayerChangeBlocked;
@@ -88,6 +92,7 @@ public class LayerChanger : MonoBehaviour
             collidersPerLayer[i] = layerGroups[i].GetComponentsInChildren<TilemapCollider2D>(true);
         }
 
+
         sortingLayerIndexById = new Dictionary<int, int>(layerSortingLayerNames.Length);
         for (int i = 0; i < layerSortingLayerNames.Length; i++)
         {
@@ -103,12 +108,13 @@ public class LayerChanger : MonoBehaviour
             sortingLayerIndexById[id] = i;
         }
 
+
         dimensionLayerIds = new int[dimensionLayerNames.Length];
         for (int i = 0; i < dimensionLayerNames.Length; i++)
         {
             int id = LayerMask.NameToLayer(dimensionLayerNames[i]);
             if (id == -1)
-                Debug.LogError($"LayerChanger: la Physics Layer '{dimensionLayerNames[i]}' no existe. Créala en Project Settings > Tags and Layers.");
+                Debug.LogError($"LayerChanger: Physics Layer '{dimensionLayerNames[i]}' doesnt exitsz");
             dimensionLayerIds[i] = id;
         }
 
@@ -123,7 +129,7 @@ public class LayerChanger : MonoBehaviour
         {
             int id = LayerMask.NameToLayer(pushableLayerNames[i]);
             if (id == -1)
-                Debug.LogError($"LayerChanger: la Physics Layer '{pushableLayerNames[i]}' no existe.");
+                Debug.LogError($"LayerChanger: Physics Layer '{pushableLayerNames[i]}' doesnt exist.");
             pushableLayerIds[i] = id;
         }
 
@@ -141,6 +147,8 @@ public class LayerChanger : MonoBehaviour
 
     private void Start()
     {
+        controls = playerMovement.Controls;
+
         layerIndex = 1;
         ApplyLayerState(true);
         OnLayerChanged?.Invoke(layerIndex);
@@ -148,12 +156,14 @@ public class LayerChanger : MonoBehaviour
 
     void Update()
     {
-        float scroll = Mouse.current.scroll.value.y;
+        float scroll = controls.Player.ScrollLayer.ReadValue<float>();
 
-        if (scroll > 0f)
+        if (scroll > 0f && lastScrollValue <= 0f)
             ChangeLayer(layerIndex + 1);
-        else if (scroll < 0f)
+        else if (scroll < 0f && lastScrollValue >= 0f)
             ChangeLayer(layerIndex - 1);
+
+        lastScrollValue = scroll;
     }
 
     private void ChangeLayer(int newIndex)
