@@ -46,6 +46,7 @@ public class PlayerMovement : MonoBehaviour
     private float slidingTimeCounter;
     private int lastWallJumpSide = 0; // 0 = any, -1 = left, 1 = right
     private int coyoteSourceSide = 0;
+    
 
     [Header("Layer Changer")]
     [SerializeField] private LayerChanger layerChanger;
@@ -65,6 +66,8 @@ public class PlayerMovement : MonoBehaviour
     public bool dash;
     public bool isPushingWall;
     public bool isSliding;
+    public bool wallOrBoxLeft;
+    public bool wallOrBoxRight;
     public bool IsJumpHeld { get; private set; }
 
     public float speed;
@@ -151,8 +154,8 @@ public class PlayerMovement : MonoBehaviour
 
     private void Jump()
     {
-        bool touchingWallLeft = !isGrounded && direction < 0 && wallLeft && lastWallJumpSide != -1;
-        bool touchingWallRight = !isGrounded && direction > 0 && wallRight && lastWallJumpSide != 1;
+        bool touchingWallLeft = !isGrounded && direction < 0 && wallOrBoxLeft && lastWallJumpSide != -1;
+        bool touchingWallRight = !isGrounded && direction > 0 && wallOrBoxRight && lastWallJumpSide != 1;
         bool canWallJumpLeft = touchingWallLeft;
         bool canWallJumpRight = touchingWallRight;
 
@@ -202,16 +205,23 @@ public class PlayerMovement : MonoBehaviour
     private void OnWall()
     {
         float savedSpeed = speed;
-        int sidePushing = 0; // 0 any, -1 left, 1 right
+        int sidePushing = 0;
         float initialGravityScale = rb.gravityScale;
 
-        if (direction < 0 && wallLeft)
+        LayerMask pushMask = pushableMaskPerLayer[layerChanger.layerIndex];
+        bool boxLeft = !isGrounded && Physics2D.OverlapBox(leftWallDetector.position, wallCheckSize, 0f, pushMask);
+        bool boxRight = !isGrounded && Physics2D.OverlapBox(rightWallDetector.position, wallCheckSize, 0f, pushMask);
+
+        wallOrBoxLeft = wallLeft || boxLeft;
+        wallOrBoxRight = wallRight || boxRight;
+
+        if (direction < 0 && wallOrBoxLeft)
         {
             isPushingWall = true;
             sidePushing = -1;
             slidingTimeCounter -= Time.deltaTime;
         }
-        else if (direction > 0 && wallRight)
+        else if (direction > 0 && wallOrBoxRight)
         {
             isPushingWall = true;
             sidePushing = 1;

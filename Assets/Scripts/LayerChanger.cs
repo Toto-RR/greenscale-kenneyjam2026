@@ -42,8 +42,8 @@ public class LayerChanger : MonoBehaviour
         new Color(0.25f, 0.45f, 0.95f),
         new Color(0.65f, 0.80f, 1.00f)
     };
-    [Range(0f, 1f)]
-    [SerializeField] private float ghostAlpha = 0.2f;
+    [Range(0f, 1f)][SerializeField] private float ghostAlpha = 0.2f;
+    [Range(0f, 1f)][SerializeField] private float ghostDesaturation = 0.85f;
 
     public float GhostAlpha => ghostAlpha;
 
@@ -58,7 +58,7 @@ public class LayerChanger : MonoBehaviour
 
     public bool debug = true;
 
-    private TilemapRenderer[][] renderersPerLayer;
+    private Tilemap[][] tilemapsPerLayer;
     private TilemapCollider2D[][] collidersPerLayer;
 
     private Dictionary<int, int> sortingLayerIndexById;
@@ -83,12 +83,12 @@ public class LayerChanger : MonoBehaviour
         }
         Instance = this;
 
-        renderersPerLayer = new TilemapRenderer[layerGroups.Length][];
+        tilemapsPerLayer = new Tilemap[layerGroups.Length][];
         collidersPerLayer = new TilemapCollider2D[layerGroups.Length][];
 
         for (int i = 0; i < layerGroups.Length; i++)
         {
-            renderersPerLayer[i] = layerGroups[i].GetComponentsInChildren<TilemapRenderer>(true);
+            tilemapsPerLayer[i] = layerGroups[i].GetComponentsInChildren<Tilemap>(true);
             collidersPerLayer[i] = layerGroups[i].GetComponentsInChildren<TilemapCollider2D>(true);
         }
 
@@ -232,17 +232,28 @@ public class LayerChanger : MonoBehaviour
             Color baseColor = activeColors[i];
             Color finalColor = isActive
                 ? baseColor
-                : new Color(baseColor.r, baseColor.g, baseColor.b, ghostAlpha);
+                : GetGhostColor(baseColor);
 
-            foreach (var renderer in renderersPerLayer[i])
-                renderer.material.DOColor(finalColor, transitionDuration);
-            
+            foreach (var tilemap in tilemapsPerLayer[i])
+            {
+                Tilemap tm = tilemap; 
+                DOTween.To(() => tm.color, c => tm.color = c, finalColor, transitionDuration);
+            }
+
             Physics2D.IgnoreLayerCollision(playerLayerId, dimensionLayerIds[i], !isActive);
             Physics2D.IgnoreLayerCollision(playerLayerId, pushableLayerIds[i], !isActive);
         }
     }
 
     public Color[] GetActiveColors => activeColors;
+    private Color GetGhostColor(Color baseColor)
+    {
+        float luminance = baseColor.r * 0.299f + baseColor.g * 0.587f + baseColor.b * 0.114f;
+        Color gray = new Color(luminance, luminance, luminance, 1f);
+        Color desaturated = Color.Lerp(baseColor, gray, ghostDesaturation);
+        desaturated.a = ghostAlpha;
+        return desaturated;
+    }
 
     public void SetSpriteOnLayer(SpriteRenderer renderer)
     {
@@ -260,7 +271,7 @@ public class LayerChanger : MonoBehaviour
         Color baseColor = activeColors[index];
         renderer.color = isActive
             ? baseColor
-            : new Color(baseColor.r, baseColor.g, baseColor.b, ghostAlpha);
+            : GetGhostColor(baseColor);
     }
 
     public int GetPhysicsLayerId(int dimensionIndex) => dimensionLayerIds[dimensionIndex];

@@ -47,14 +47,14 @@ TagManager:
   - name: Floor
     uniqueID: 1874901909
     locked: 0
-  - name: LightGreen
-    uniqueID: 419830305
+  - name: DarkGreen
+    uniqueID: 776299481
     locked: 0
   - name: Green
     uniqueID: 2613584991
     locked: 0
-  - name: DarkGreen
-    uniqueID: 776299481
+  - name: LightGreen
+    uniqueID: 419830305
     locked: 0
   - name: Decoration
     uniqueID: 2408497011
